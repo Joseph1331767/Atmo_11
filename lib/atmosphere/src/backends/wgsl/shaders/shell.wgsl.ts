@@ -34,6 +34,7 @@ uniform planetMagneticEffect: f32;
 uniform auroraEffectIntensity: f32;
 uniform auroraHeightScale: f32;
 uniform auroraVariance: f32;
+uniform darkSideOcclusion: f32;
 uniform glowEffectScale: f32;
 uniform shellOpacity: f32;
 uniform time: f32;
@@ -89,6 +90,7 @@ uniform planetMagneticEffect: f32;
 uniform auroraEffectIntensity: f32;
 uniform auroraHeightScale: f32;
 uniform auroraVariance: f32;
+uniform darkSideOcclusion: f32;
 uniform glowEffectScale: f32;
 uniform shellOpacity: f32;
 uniform time: f32;
@@ -132,11 +134,11 @@ fn getAurora(p: vec3<f32>, n: vec3<f32>, h: f32, rayDir: vec3<f32>, time: f32, s
     let combinedForce = sunParticle * (1.0 + magnetic * 0.5);
     let spread = clamp(combinedForce * 0.1, 0.0, 0.7);
     
-    let nightShift = smoothstep(0.5, -1.0, dot(n, sunDir)) * 0.15;
+    let nightShift = (1.0 - smoothstep(-1.0, 0.5, dot(n, sunDir))) * 0.15;
     
     let ringCenter = 0.85 - spread * 0.5 - nightShift;
     let ringWidth = 0.05 + spread * 0.3;
-    let ring = smoothstep(ringCenter - ringWidth, ringCenter, lat) * smoothstep(ringCenter + ringWidth, ringCenter, lat);
+    let ring = smoothstep(ringCenter - ringWidth, ringCenter, lat) * (1.0 - smoothstep(ringCenter, ringCenter + ringWidth, lat));
     
     if (ring < 0.001) { return vec3<f32>(0.0); }
     
@@ -144,7 +146,7 @@ fn getAurora(p: vec3<f32>, n: vec3<f32>, h: f32, rayDir: vec3<f32>, time: f32, s
     let auroraTop = atmoHeight * max(1.0, 4.0 * heightScale);
     
     let hNorm = (h - auroraBottom) / (auroraTop - auroraBottom);
-    let hProfile = smoothstep(0.0, 0.1, hNorm) * smoothstep(1.0, 0.3, hNorm);
+    let hProfile = smoothstep(0.0, 0.1, hNorm) * (1.0 - smoothstep(0.3, 1.0, hNorm));
     
     let viewDependence = pow(1.0 - abs(dot(rayDir, n)), 3.0) * 2.0 + 0.5;
     
@@ -238,8 +240,8 @@ fn main(input : FragmentInputs) -> FragmentOutputs {
         
         // Bias towards the planet (tMax)
         let bias = 1.5;
-        let t0 = tMin + totalDist * (1.0 - pow(1.0 - normalizedT, bias));
-        let t1 = tMin + totalDist * (1.0 - pow(1.0 - nextNormalizedT, bias));
+        let t0 = tMin + totalDist * (1.0 - pow(max(0.0, 1.0 - normalizedT), bias));
+        let t1 = tMin + totalDist * (1.0 - pow(max(0.0, 1.0 - nextNormalizedT), bias));
         let stepSize = t1 - t0;
         let tMid = t0 + stepSize * 0.5;
 
@@ -315,6 +317,24 @@ fn main(input : FragmentInputs) -> FragmentOutputs {
     if (uniforms.auroraEffectIntensity > 0.0) {
         alpha = max(alpha, length(totalAurora));
     }
+
+    // Dark side occlusion: mask out atmosphere and aurora on the night side
+    if (uniforms.darkSideOcclusion > 0.0) {
+        var nightFactor = 1.0;
+        for (var i = 0; i < 4; i++) {
+            if (i >= uniforms.sunCount) { break; }
+            let sDir = normalize(-uniforms.sunDirections[i].xyz);
+            // Dot product of planet-to-camera vector and sun direction
+            let sunViewDot = dot(normalize(uniforms.cameraPosition - planetCenter), sDir);
+            // 0.0 if camera is on night side, 1.0 if on day side
+            nightFactor = min(nightFactor, smoothstep(-0.5, 0.2, sunViewDot));
+        }
+        // Fade to edgeGlow (center becomes transparent) on the night side
+        let occlusion = mix(1.0, pow(edgeGlow, 0.5), (1.0 - nightFactor) * uniforms.darkSideOcclusion);
+        alpha *= occlusion;
+        color *= occlusion;
+    }
+
     alpha *= uniforms.shellOpacity;
 
     output.color = vec4<f32>(color, alpha);

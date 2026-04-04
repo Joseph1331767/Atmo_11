@@ -53,6 +53,7 @@ uniform float planetMagneticEffect;
 uniform float auroraEffectIntensity;
 uniform float auroraHeightScale;
 uniform float auroraVariance;
+uniform float darkSideOcclusion;
 uniform float glowEffectScale;
 uniform float shellOpacity;
 uniform float time;
@@ -96,11 +97,11 @@ vec3 getAurora(vec3 p, vec3 n, float h, vec3 rayDir, float time, vec3 sunDir, fl
     float spread = clamp(combinedForce * 0.1, 0.0, 0.7);
     
     // Vector bias away from the sun (night side gets pushed further towards equator)
-    float nightShift = smoothstep(0.5, -1.0, dot(n, sunDir)) * 0.15;
+    float nightShift = (1.0 - smoothstep(-1.0, 0.5, dot(n, sunDir))) * 0.15;
     
     float ringCenter = 0.85 - spread * 0.5 - nightShift;
     float ringWidth = 0.05 + spread * 0.3;
-    float ring = smoothstep(ringCenter - ringWidth, ringCenter, lat) * smoothstep(ringCenter + ringWidth, ringCenter, lat);
+    float ring = smoothstep(ringCenter - ringWidth, ringCenter, lat) * (1.0 - smoothstep(ringCenter, ringCenter + ringWidth, lat));
     
     if (ring < 0.001) return vec3(0.0);
     
@@ -108,7 +109,7 @@ vec3 getAurora(vec3 p, vec3 n, float h, vec3 rayDir, float time, vec3 sunDir, fl
     float auroraTop = atmoHeight * max(1.0, 4.0 * heightScale);
     
     float hNorm = (h - auroraBottom) / (auroraTop - auroraBottom);
-    float hProfile = smoothstep(0.0, 0.1, hNorm) * smoothstep(1.0, 0.3, hNorm);
+    float hProfile = smoothstep(0.0, 0.1, hNorm) * (1.0 - smoothstep(0.3, 1.0, hNorm));
     
     // View dependence (curtain effect - brighter when looking through the edge)
     float viewDependence = pow(1.0 - abs(dot(rayDir, n)), 3.0) * 2.0 + 0.5;
@@ -211,8 +212,8 @@ void main() {
         
         // Bias towards the planet (tMax)
         float bias = 1.5;
-        float t0 = tMin + totalDist * (1.0 - pow(1.0 - normalizedT, bias));
-        float t1 = tMin + totalDist * (1.0 - pow(1.0 - nextNormalizedT, bias));
+        float t0 = tMin + totalDist * (1.0 - pow(max(0.0, 1.0 - normalizedT), bias));
+        float t1 = tMin + totalDist * (1.0 - pow(max(0.0, 1.0 - nextNormalizedT), bias));
         float stepSize = t1 - t0;
         float tMid = t0 + stepSize * 0.5;
 
@@ -289,6 +290,24 @@ void main() {
     if (auroraEffectIntensity > 0.0) {
         alpha = max(alpha, length(totalAurora));
     }
+
+    // Dark side occlusion: mask out atmosphere and aurora on the night side
+    if (darkSideOcclusion > 0.0) {
+        float nightFactor = 1.0;
+        for (int i = 0; i < 4; i++) {
+            if (i >= sunCount) break;
+            vec3 sDir = normalize(-sunDirections[i].xyz);
+            // Dot product of planet-to-camera vector and sun direction
+            float sunViewDot = dot(normalize(cameraPosition - planetCenter), sDir);
+            // 0.0 if camera is on night side, 1.0 if on day side
+            nightFactor = min(nightFactor, smoothstep(-0.5, 0.2, sunViewDot));
+        }
+        // Fade to edgeGlow (center becomes transparent) on the night side
+        float occlusion = mix(1.0, pow(edgeGlow, 0.5), (1.0 - nightFactor) * darkSideOcclusion);
+        alpha *= occlusion;
+        color *= occlusion;
+    }
+
     alpha *= shellOpacity;
 
     gl_FragColor = vec4(color, alpha);

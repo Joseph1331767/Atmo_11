@@ -73,6 +73,9 @@ export interface AtmosphereConfig {
   auroraHeightScale: number;
   auroraVariance: number;
 
+  // Occlusion parameters
+  darkSideOcclusion: number;
+
   customUniforms: Record<string, number | number[]>;
 
   shellVertexSource?: string;

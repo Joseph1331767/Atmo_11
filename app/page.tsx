@@ -113,11 +113,11 @@ export default function Home() {
           
           // @ts-ignore
           const { WebGPUEngine } = await import('@babylonjs/core');
-          createdEngine = new WebGPUEngine(canvasRef.current, { antialias: true });
+          createdEngine = new WebGPUEngine(canvasRef.current as HTMLCanvasElement, { antialias: true }) as any;
           await (createdEngine as any).initAsync();
         } else {
           try {
-            createdEngine = new Engine(canvasRef.current, true);
+            createdEngine = new Engine(canvasRef.current as HTMLCanvasElement, true);
             actualBackend = AtmosphereBackend.GLSL;
           } catch (e: any) {
             throw new Error(`WebGL not supported: ${e.message || e}`);
@@ -140,7 +140,8 @@ export default function Home() {
       cameraRef.current = camera;
 
       const light = new HemisphericLight("light", new Vector3(0, 1, 0), scene);
-      light.intensity = 0.2;
+      light.intensity = 0.02;
+      light.groundColor = new Color3(0.02, 0.02, 0.02);
 
       const dirLight = new DirectionalLight("dirLight", new Vector3(-1, -0.5, -1), scene);
       dirLight.intensity = sunLightIntensity;
@@ -204,13 +205,14 @@ export default function Home() {
       setAtmosphere(atmo);
 
       engine.runRenderLoop(() => {
+        if (!engine || !atmo || !scene) return;
         const deltaTime = engine.getDeltaTime() / 1000;
         atmo.update(deltaTime, camera.position);
         scene.render();
       });
 
       const handleResize = () => {
-        engine.resize();
+        if (engine) engine.resize();
       };
       window.addEventListener('resize', handleResize);
       } catch (e: any) {
@@ -229,7 +231,7 @@ export default function Home() {
       if (scene) scene.dispose();
       if (engine) engine.dispose();
     };
-  }, [backendType]);
+  }, [backendType, sunLightIntensity]);
 
   const density = atmosphere ? atmosphere.getDensityAtAltitude(altitude) : 0;
   const opticalDepth = atmosphere ? atmosphere.getOpticalDepthAtAltitude(altitude) : 0;

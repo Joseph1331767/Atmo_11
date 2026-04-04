@@ -50,6 +50,7 @@ const DEFAULT_CONFIG: AtmosphereConfig = {
   auroraEffectIntensity: 0.0,
   auroraHeightScale: 1.0,
   auroraVariance: 1.0,
+  darkSideOcclusion: 0.0,
   customUniforms: {},
   renderOrder: 100,
 };
@@ -198,7 +199,7 @@ export class AtmosphereGlow {
     } else if (this.material) {
       // Just update material properties if it exists
       this.material.backFaceCulling = this.config.backFaceCulling;
-      this.material.depthWrite = this.config.depthWrite;
+      this.material.disableDepthWrite = !this.config.depthWrite;
     }
   }
 

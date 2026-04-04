@@ -47,6 +47,7 @@ export class WGSLBackend implements IAtmosphereBackend {
           'auroraEffectIntensity',
           'auroraHeightScale',
           'auroraVariance',
+          'darkSideOcclusion',
           'glowEffectScale',
           'shellOpacity',
           'time',
@@ -61,7 +62,7 @@ export class WGSLBackend implements IAtmosphereBackend {
     );
 
     material.backFaceCulling = config.backFaceCulling;
-    material.depthWrite = config.depthWrite;
+    material.disableDepthWrite = !config.depthWrite;
     material.alphaMode = this.getAlphaMode(config.blendMode, scene);
     material.needDepthPrePass = true;
     material.needAlphaBlending = () => true;
@@ -131,6 +132,7 @@ export class WGSLBackend implements IAtmosphereBackend {
     material.setFloat('auroraEffectIntensity', config.auroraEffectIntensity ?? 0.0);
     material.setFloat('auroraHeightScale', config.auroraHeightScale ?? 1.0);
     material.setFloat('auroraVariance', config.auroraVariance ?? 1.0);
+    material.setFloat('darkSideOcclusion', config.darkSideOcclusion ?? 0.0);
 
     material.setFloat('glowEffectScale', config.glowEffectScale);
     material.setFloat('shellOpacity', config.shellOpacity);
